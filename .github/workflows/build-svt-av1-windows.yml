@@ -91,9 +91,30 @@ jobs:
       - name: Install NASM
         run: |
           choco install nasm -y --no-progress
-          $chocoBin = "C:\ProgramData\chocolatey\bin"
-          Add-Content $env:GITHUB_PATH $chocoBin
-          $env:Path = "$env:Path;$chocoBin"
+
+          $nasm = Get-Command nasm -ErrorAction SilentlyContinue
+          if ($null -eq $nasm) {
+            $candidates = @(
+              "${env:ProgramFiles}\NASM\nasm.exe",
+              "${env:ProgramFiles(x86)}\NASM\nasm.exe",
+              "C:\ProgramData\chocolatey\lib\nasm\tools\nasm.exe"
+            )
+
+            $nasmPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if ($null -eq $nasmPath) {
+              $nasmPath = Get-ChildItem -Path "${env:ProgramFiles}", "C:\ProgramData\chocolatey\lib\nasm" -Filter nasm.exe -Recurse -ErrorAction SilentlyContinue |
+                Select-Object -First 1 -ExpandProperty FullName
+            }
+
+            if ($null -eq $nasmPath) {
+              Write-Error "NASM installed, but nasm.exe was not found."
+            }
+
+            $nasmDir = Split-Path $nasmPath -Parent
+            Add-Content $env:GITHUB_PATH $nasmDir
+            $env:Path = "$env:Path;$nasmDir"
+          }
+
           nasm -v
 
       - name: Clone SVT-AV1 source
