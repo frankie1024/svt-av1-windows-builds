@@ -28,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
       source_url: ${{ steps.release.outputs.source_url }}
       should_build: ${{ steps.release.outputs.should_build }}
       release_exists: ${{ steps.release.outputs.release_exists }}
@@ -54,6 +55,7 @@ jobs:
             exit 1
           fi
 
+          version="${tag#v}"
           source_url="https://gitlab.com/AOMediaCodec/SVT-AV1/-/tree/${tag}"
           release_exists=false
           should_build=true
@@ -67,12 +69,14 @@ jobs:
 
           {
             echo "tag=$tag"
+            echo "version=$version"
             echo "source_url=$source_url"
             echo "release_exists=$release_exists"
             echo "should_build=$should_build"
           } >> "$GITHUB_OUTPUT"
 
           echo "Upstream tag: $tag"
+          echo "Version: $version"
           echo "Release exists: $release_exists"
           echo "Should build: $should_build"
 
@@ -132,6 +136,7 @@ jobs:
       - name: Package binaries
         env:
           TAG: ${{ needs.resolve-release.outputs.tag }}
+          VERSION: ${{ needs.resolve-release.outputs.version }}
           SOURCE_URL: ${{ needs.resolve-release.outputs.source_url }}
         run: |
           $ErrorActionPreference = "Stop"
@@ -143,13 +148,14 @@ jobs:
           }
 
           $commit = (Get-Content svt-av1-commit.txt -Raw).Trim()
-          $packageRoot = "artifacts/SVT-AV1-$env:TAG-windows-x64"
+          $packageRoot = "artifacts/svt-av1-$env:VERSION-x64"
           New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
           Copy-Item "$binDir/*" $packageRoot -Recurse
 
           @(
             "SVT-AV1 Windows x64 build"
             "Upstream tag: $env:TAG"
+            "Version: $env:VERSION"
             "Upstream commit: $commit"
             "Upstream source: $env:SOURCE_URL"
             "Build OS: windows-2022"
@@ -157,27 +163,28 @@ jobs:
             "Built at UTC: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))"
           ) | Set-Content -Encoding UTF8 "$packageRoot/BUILD_INFO.txt"
 
-          Compress-Archive -Path "$packageRoot/*" -DestinationPath "SVT-AV1-$env:TAG-windows-x64.zip" -Force
+          Compress-Archive -Path "$packageRoot/*" -DestinationPath "svt-av1-$env:VERSION-x64.zip" -Force
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SVT-AV1-${{ needs.resolve-release.outputs.tag }}-windows-x64
-          path: SVT-AV1-${{ needs.resolve-release.outputs.tag }}-windows-x64.zip
+          name: svt-av1-${{ needs.resolve-release.outputs.version }}-x64
+          path: svt-av1-${{ needs.resolve-release.outputs.version }}-x64.zip
           if-no-files-found: error
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.resolve-release.outputs.tag }}
+          VERSION: ${{ needs.resolve-release.outputs.version }}
           SOURCE_URL: ${{ needs.resolve-release.outputs.source_url }}
           RELEASE_EXISTS: ${{ needs.resolve-release.outputs.release_exists }}
         run: |
           $ErrorActionPreference = "Stop"
 
-          $asset = "SVT-AV1-$env:TAG-windows-x64.zip"
+          $asset = "svt-av1-$env:VERSION-x64.zip"
           $notes = @"
-          Automated Windows x64 build of upstream SVT-AV1 $env:TAG.
+          Automated Windows x64 build of upstream SVT-AV1 $env:VERSION.
 
           Upstream source: $env:SOURCE_URL
 
@@ -187,7 +194,7 @@ jobs:
           if ($env:RELEASE_EXISTS -eq "true") {
             gh release upload $env:TAG $asset --clobber
           } else {
-            gh release create $env:TAG $asset --title "SVT-AV1 $env:TAG Windows x64" --notes $notes
+            gh release create $env:TAG $asset --title "SVT-AV1 $env:VERSION Windows x64" --notes $notes
           }
 
   already-built:

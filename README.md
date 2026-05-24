@@ -19,7 +19,7 @@ Each GitHub release contains:
 The packaged archive name is:
 
 ```text
-SVT-AV1-<tag>-windows-x64.zip
+svt-av1-<version>-x64.zip
 ```
 
 ## Manual Build
